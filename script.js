@@ -1,76 +1,100 @@
-function convertText() {
-  const input = document.getElementById("inputText").value;
+function negateAxes(name, rot) {
+   const r = [...rot];
 
-  let data;
-  try {
-    data = JSON.parse(input);
-  } catch (e) {
-    alert("JSON 형식이 아님!");
-    return;
-  }
+   if (name === "BodyMesh") {
+      r[0] *= -1;
+      r[1] *= -1;
+      return r;
+   }
+   if (name.includes("Arm")) {
+      r[1] *= -1;
+      return r;
+   }
+   if (name.includes("Leg")) {
+      r[0] *= -1;
+      r[1] *= -1;
+      return r;
+   }
+   if (name.includes("Head")) {
+      r[0] *= -1;
+      r[1] *= -1;
+      return r;
+   }
 
-  // animations → 첫 애니메이션 가져오기
-  const animKey = Object.keys(data.animations)[0];
-  const anim = data.animations[animKey];
-  const bones = anim.bones || {};
+   return r;
+}
 
-  const resultBones = {};
+function stringifyCompactArrays(obj) {
+   let json = JSON.stringify(obj, null, 2);
 
-  // bone별 부호 규칙
-  function applyRule(boneName, rot) {
-    let [x, y, z] = rot;
-
-    if (boneName === "BodyMesh") { // → TorsoNode로 이름 변경됨
-      x *= -1; y *= -1;
-    }
-    else if (boneName.includes("Arm")) {
-      y *= -1;
-    }
-    else if (boneName.includes("Leg")) {
-      x *= -1; y *= -1;
-    }
-    else if (boneName.includes("Head")) {
-      x *= -1; y *= -1;
-    }
-
-    return [x, y, z];
-  }
-
-  // bones 순회
-  for (const boneName in bones) {
-    const bone = bones[boneName];
-    if (!bone.rotation) continue;
-
-    let outputBoneName = boneName === "BodyMesh" ? "TorsoNode" : boneName;
-    let rotation = bone.rotation;
-
-    // rotation 형태 판별
-    if (Array.isArray(rotation)) {
-      // 단일 배열
-      resultBones[outputBoneName] = {
-        rotation: applyRule(boneName, rotation)
-      };
-    } else {
-      // 타임라인 형태
-      const newTimeline = {};
-      for (const t in rotation) {
-        newTimeline[t] = applyRule(boneName, rotation[t]);
+   // [x, y, z] 형태만 한 줄로 압축
+   json = json.replace(
+      /\[\s*([^\[\]]*?)\s*\]/g,
+      (match, inside) => {
+         const cleaned = inside
+            .split(",")
+            .map(s => s.trim())
+            .join(", ");
+         return `[${cleaned}]`;
       }
+   );
 
-      resultBones[outputBoneName] = {
-        rotation: newTimeline
-      };
-    }
-  }
+   return json;
+}
 
-  // 최종 출력 포맷
-  const finalObj = {
-    loop: true,
-    animation_length: anim.animation_length,
-    bones: resultBones
-  };
+function convertText() {
+   const input = document.getElementById("inputText").value;
 
-  // 예쁘게 출력
-  const output = "const anime = " + JSON.stringify(finalObj, null, 2);
-  document.getElementById("outputText").value = output;
+   let json;
+   try {
+      json = JSON.parse(input);
+   } catch (e) {
+      alert("JSON 형식이 아님!");
+      return;
+   }
+
+   const animKey = Object.keys(json.animations)[0];
+   const anim = json.animations[animKey];
+   const bones = anim.bones || {};
+
+   const outBones = {};
+
+   for (const boneName in bones) {
+      const outputBoneName = boneName === "BodyMesh" ? "TorsoNode" : boneName;
+      const rotation = bones[boneName].rotation;
+
+      if (Array.isArray(rotation)) {
+         outBones[outputBoneName] = {
+            rotation: negateAxes(boneName, rotation)
+         };
+      } else {
+         const newRotation = {};
+         for (const t in rotation) {
+            newRotation[t] = negateAxes(boneName, rotation[t]);
+         }
+         outBones[outputBoneName] = {
+            rotation: newRotation
+         };
+      }
+   }
+
+   const result = {
+      loop: true,
+      animation_length: anim.animation_length,
+      bones: outBones
+   };
+
+   document.getElementById("outputText").value =
+      "const anime = " + stringifyCompactArrays(result);
+}
+
+async function copyText() {
+   const text = document.getElementById("outputText").value;
+
+   try {
+      await navigator.clipboard.writeText(text);
+      alert("복사 완료!");
+   } catch (e) {
+      alert("복사 실패");
+   }
 }
