@@ -7,12 +7,12 @@ function negateAxes(name, rot) {
       return r;
    }
    if (name.includes("Arm")) {
-      r[1] *= -1;
+      r[0] *= -1;
+      r[2] *= -1;
       return r;
    }
    if (name.includes("Leg")) {
-      r[0] *= -1;
-      r[1] *= -1;
+      r[2] *= -1;
       return r;
    }
    if (name.includes("Head")) {
